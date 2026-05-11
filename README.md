@@ -9,19 +9,39 @@
 > 系統使用者:**公司業務員 / 報價助理(內部使用)**
 > 對話內容:外部客戶與其專案的報價需求
 
-## Lab Day Quickstart(用講師預先 build 好的 GHCR image)
+## Lab Day Quickstart
 
-學員只需 **gcloud / uv / agents-cli** 三個 CLI(不需 docker 也不需 go):
+學員只需 **gcloud / uv / agents-cli** 三個 CLI(不需 docker 也不需 go)。
+
+`GCP_PROJECT` 是 **Project ID**(小寫+連字號,如 `total-ensign-373607`),不是顯示名稱。可用 `gcloud projects list` 查。
+
+### 路徑 1:Lab 內建 Agent(One-shot,Cloud Run + Agent 一起部署)
 
 ```bash
 git clone https://github.com/cshliu77/h-beam-quote
 cd h-beam-quote
-export GCP_PROJECT=your-gcp-project
-./scripts/lab-bootstrap.sh
+export GCP_PROJECT=your-project-id
+./scripts/lab-bootstrap.sh        # 跑 deploy-service.sh + deploy-agent.sh
 ```
 
-腳本會跳過 `Cloud Build / Artifact Registry`,直接在 Cloud Run 拉 `ghcr.io/cshliu77/h-beam-quote:latest`。
-從 `git clone` 到 Agent 部署完成 < 5 分鐘。
+預設用 `ghcr.io/cshliu77/h-beam-quote:latest`,透過 AR remote repo 代理(Cloud Run 不能直拉 GHCR)。
+
+### 路徑 2:只部署後端,自己開發 Agent(學員自由發揮)
+
+```bash
+export GCP_PROJECT=your-project-id
+./scripts/deploy-service.sh       # 只部署 Quote Service 到 Cloud Run
+# → 拿到 URL 後自己寫 Agent 接它
+```
+
+### 路徑 3:後端已有(本機 docker 或別處)、只部署 Agent
+
+```bash
+export GCP_PROJECT=your-project-id
+export QUOTE_API_URL=http://localhost:8080   # 或別處後端
+./scripts/deploy-agent.sh         # 只部署 Lab 內建 Agent 到 Agent Runtime
+# 若不設 QUOTE_API_URL,腳本會自動從 Cloud Run 撈 h-beam-quote service URL
+```
 
 ### 鎖版(Lab Day 避免上課中途漂移)
 
@@ -32,8 +52,8 @@ H_BEAM_IMAGE=ghcr.io/cshliu77/h-beam-quote:v0.1.0 ./scripts/lab-bootstrap.sh
 ### 自己改 Go 程式碼?走本機 build(escape hatch)
 
 ```bash
-BUILD_LOCAL=true ./scripts/lab-bootstrap.sh
-# 改回 9-phase 流程:Cloud Build → Artifact Registry → Cloud Run
+BUILD_LOCAL=true ./scripts/deploy-service.sh
+# 走 Cloud Build → AR standard repo(改 9 phases)
 ```
 
 ### 看狀態 / 清資源
