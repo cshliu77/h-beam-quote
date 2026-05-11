@@ -132,6 +132,18 @@ setup_sa() {
       --display-name="H-Beam Agent Runtime SA" \
       --project="$GCP_PROJECT" --quiet
     ok "SA 已建立"
+
+    # IAM 傳播延遲:SA 剛建好但 add-iam-policy-binding 可能還看不到。
+    # 輪詢 describe 直到一致(典型 ~5-10 秒)。
+    info "等 SA 在 IAM API 一致..."
+    for i in $(seq 1 30); do
+      if gcloud iam service-accounts describe "$AGENT_SA_EMAIL" \
+           --project="$GCP_PROJECT" >/dev/null 2>&1; then
+        sleep 2  # 額外緩衝,避免 describe 看到但 policy binding API 還沒
+        break
+      fi
+      sleep 2
+    done
   fi
 
   local roles=(
@@ -142,9 +154,19 @@ setup_sa() {
     roles/aiplatform.user
   )
   for role in "${roles[@]}"; do
-    gcloud projects add-iam-policy-binding "$GCP_PROJECT" \
-      --member="serviceAccount:${AGENT_SA_EMAIL}" \
-      --role="$role" --condition=None --quiet >/dev/null
+    # 加 retry — IAM 傳播延遲新 SA 時可能仍說 "does not exist"
+    local attempt=0
+    until gcloud projects add-iam-policy-binding "$GCP_PROJECT" \
+            --member="serviceAccount:${AGENT_SA_EMAIL}" \
+            --role="$role" --condition=None --quiet >/dev/null 2>&1; do
+      attempt=$((attempt+1))
+      if (( attempt >= 10 )); then
+        err "綁定 $role 失敗(已試 10 次)"
+        exit 1
+      fi
+      info "  ⟳ 重試 $role(IAM 傳播中,${attempt}/10)..."
+      sleep 3
+    done
     info "  ✓ $role"
   done
   ok "5 個必要角色已綁定(含 serviceUsageConsumer 防 OTel 403)"
