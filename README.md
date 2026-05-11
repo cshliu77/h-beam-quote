@@ -120,7 +120,9 @@ $env:BUILD_LOCAL = 'true'
    gcloud auth application-default login
    ```
 
-詳細 7 段教學流程見 `agent/lab_script.md`。
+詳細 7 段教學流程見 [`agent/lab_script.md`](./agent/lab_script.md)。
+
+**部署完想知道能問 Agent 什麼?** → 看 [`agent/QUERIES.md`](./agent/QUERIES.md)(8 大情境 + 講師 demo 劇本 + 提問技巧)
 
 ## 架構
 

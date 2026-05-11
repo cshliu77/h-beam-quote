@@ -22,6 +22,7 @@ agent/
 ├── .env.example                  # GCP_PROJECT、QUOTE_API_URL、SERVICE_ACCOUNT 等
 ├── deployment_metadata.json      # agents-cli 部署紀錄(remote_agent_runtime_id)
 ├── lab_script.md                 # 講師腳本(線性流程,從導覽到部署)
+├── QUERIES.md                    # 學員提問指南:8 大情境 + demo 劇本 + 提問技巧
 ├── README.md                     # 本檔
 │
 ├── app/                          # Agent 主目錄
