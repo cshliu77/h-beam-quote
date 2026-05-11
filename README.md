@@ -15,8 +15,14 @@
 
 `GCP_PROJECT` 是 **Project ID**(小寫+連字號,如 `total-ensign-373607`),不是顯示名稱。可用 `gcloud projects list` 查。
 
+> **作業系統:**
+> - **Mac / Linux**:用 `.sh` 腳本(`./scripts/lab-bootstrap.sh`)
+> - **Windows**:用 `.ps1` 腳本(`.\scripts\lab-bootstrap.ps1`)
+> 兩套腳本功能等價,選自己環境順手的用。
+
 ### 路徑 1:Lab 內建 Agent(One-shot,Cloud Run + Agent 一起部署)
 
+**Mac / Linux:**
 ```bash
 git clone https://github.com/cshliu77/h-beam-quote
 cd h-beam-quote
@@ -24,46 +30,97 @@ export GCP_PROJECT=your-project-id
 ./scripts/lab-bootstrap.sh        # 跑 deploy-service.sh + deploy-agent.sh
 ```
 
+**Windows(PowerShell):**
+```powershell
+git clone https://github.com/cshliu77/h-beam-quote
+cd h-beam-quote
+$env:GCP_PROJECT = 'your-project-id'
+.\scripts\lab-bootstrap.ps1       # 跑 deploy-service.ps1 + deploy-agent.ps1
+```
+
 預設用 `ghcr.io/cshliu77/h-beam-quote:latest`,透過 AR remote repo 代理(Cloud Run 不能直拉 GHCR)。
 
 ### 路徑 2:只部署後端,自己開發 Agent(學員自由發揮)
 
 ```bash
+# Mac/Linux
 export GCP_PROJECT=your-project-id
-./scripts/deploy-service.sh       # 只部署 Quote Service 到 Cloud Run
-# → 拿到 URL 後自己寫 Agent 接它
+./scripts/deploy-service.sh
+
+# Windows
+$env:GCP_PROJECT = 'your-project-id'
+.\scripts\deploy-service.ps1
 ```
+
+→ 拿到 URL 後自己寫 Agent 接它。
 
 ### 路徑 3:後端已有(本機 docker 或別處)、只部署 Agent
 
 ```bash
+# Mac/Linux
 export GCP_PROJECT=your-project-id
-export QUOTE_API_URL=http://localhost:8080   # 或別處後端
-./scripts/deploy-agent.sh         # 只部署 Lab 內建 Agent 到 Agent Runtime
-# 若不設 QUOTE_API_URL,腳本會自動從 Cloud Run 撈 h-beam-quote service URL
+export QUOTE_API_URL=http://localhost:8080
+./scripts/deploy-agent.sh
+
+# Windows
+$env:GCP_PROJECT = 'your-project-id'
+$env:QUOTE_API_URL = 'http://localhost:8080'
+.\scripts\deploy-agent.ps1
 ```
+
+不設 `QUOTE_API_URL` 則腳本會自動從 Cloud Run 撈 `h-beam-quote` service URL。
 
 ### 鎖版(Lab Day 避免上課中途漂移)
 
 ```bash
+# Mac/Linux
 H_BEAM_IMAGE=ghcr.io/cshliu77/h-beam-quote:v0.1.0 ./scripts/lab-bootstrap.sh
+
+# Windows
+$env:H_BEAM_IMAGE = 'ghcr.io/cshliu77/h-beam-quote:v0.1.0'
+.\scripts\lab-bootstrap.ps1
 ```
 
 ### 自己改 Go 程式碼?走本機 build(escape hatch)
 
 ```bash
+# Mac/Linux
 BUILD_LOCAL=true ./scripts/deploy-service.sh
-# 走 Cloud Build → AR standard repo(改 9 phases)
+
+# Windows
+$env:BUILD_LOCAL = 'true'
+.\scripts\deploy-service.ps1
 ```
 
 ### 看狀態 / 清資源
 
 ```bash
-./scripts/lab-status.sh           # 看當前部署狀態
-./scripts/lab-teardown.sh --yes   # Lab 結束後清掉所有資源
+# Mac/Linux
+./scripts/lab-status.sh
+./scripts/lab-teardown.sh --yes
+
+# Windows
+.\scripts\lab-status.ps1
+.\scripts\lab-teardown.ps1 -Yes
 ```
 
-詳細 7 段教學流程見 `h-beam-quote/agent/lab_script.md`。
+### Windows 首次設定須知
+
+1. **裝必要工具:**
+   - [gcloud SDK](https://cloud.google.com/sdk/docs/install#windows)
+   - [uv](https://docs.astral.sh/uv/getting-started/installation/):`powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
+   - `agents-cli`:`uv tool install google-agents-cli`
+   - Python 3.11+(`python` 可在 PATH)
+2. **允許跑腳本(一次性):**
+   ```powershell
+   Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+   ```
+3. **首次 gcloud 認證:**
+   ```powershell
+   gcloud auth application-default login
+   ```
+
+詳細 7 段教學流程見 `agent/lab_script.md`。
 
 ## 架構
 
