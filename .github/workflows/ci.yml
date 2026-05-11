@@ -120,24 +120,27 @@ jobs:
 
       - name: Smoke API — list products
         run: |
-          curl -sf http://localhost:8080/api/products | python3 -c "
-          import json, sys
-          d = json.load(sys.stdin)
-          assert d['count'] >= 10, f'Expected >=10 products, got {d[\"count\"]}'
-          print(f'OK {d[\"count\"]} products seeded')
-          "
+          curl -sf http://localhost:8080/api/products > /tmp/products.json
+          python3 <<'PYEOF'
+          import json
+          d = json.load(open('/tmp/products.json'))
+          assert d['count'] >= 10, f"Expected >=10 products, got {d['count']}"
+          print(f"OK {d['count']} products seeded")
+          PYEOF
 
       - name: Smoke API — calculate quote
         run: |
           curl -sf -X POST http://localhost:8080/api/quotes \
             -H "Content-Type: application/json" \
             -d '{"items":[{"product_code":"HW300x300","grade":"SS400","length_m":6,"quantity":20}]}' \
-            | python3 -c "
-          import json, sys
-          d = json.load(sys.stdin)
-          assert d['final_total_ntd'] == 321480, f'Expected 321480, got {d[\"final_total_ntd\"]}'
-          print(f'OK HW300x300x20 = NT${d[\"final_total_ntd\"]:,}')
-          "
+            > /tmp/quote.json
+          python3 <<'PYEOF'
+          import json
+          d = json.load(open('/tmp/quote.json'))
+          assert d['final_total_ntd'] == 321480, f"Expected 321480, got {d['final_total_ntd']}"
+          total = d['final_total_ntd']
+          print(f"OK HW300x300 x 20 = NT$ {total:,}")
+          PYEOF
 
       - name: Cleanup
         if: always()
