@@ -16,6 +16,7 @@ set -euo pipefail
 GCP_REGION="${GCP_REGION:-asia-east1}"
 QUOTE_SERVICE="${QUOTE_SERVICE:-h-beam-quote}"
 QUOTE_REPO="${QUOTE_REPO:-h-beam-images}"
+GHCR_PROXY_REPO="${GHCR_PROXY_REPO:-h-beam-ghcr-proxy}"
 AGENT_SA_NAME="${AGENT_SA_NAME:-h-beam-agent}"
 AGENT_SA_EMAIL="${AGENT_SA_NAME}@${GCP_PROJECT}.iam.gserviceaccount.com"
 
@@ -120,20 +121,21 @@ delete_cloud_run() {
 }
 
 # ─────────────────────────────────────────────────────────
-# 3. 刪 Artifact Registry repo(連 images 一起)
-# 注意:預設 GHCR 模式不會建這個 repo,delete 會跳過
+# 3. 刪 Artifact Registry repos(standard + GHCR proxy)
 # ─────────────────────────────────────────────────────────
 delete_artifact_registry() {
-  step "[3] 刪除 Artifact Registry repo(連 images)"
+  step "[3] 刪除 Artifact Registry repos"
 
-  if gcloud artifacts repositories describe "$QUOTE_REPO" \
-       --location="$GCP_REGION" --project="$GCP_PROJECT" >/dev/null 2>&1; then
-    gcloud artifacts repositories delete "$QUOTE_REPO" \
-      --location="$GCP_REGION" --project="$GCP_PROJECT" --quiet
-    ok "Artifact Registry repo ${QUOTE_REPO} 已刪除"
-  else
-    info "AR repo 不存在(預設 GHCR 模式不需建,跳過)"
-  fi
+  for repo in "$QUOTE_REPO" "$GHCR_PROXY_REPO"; do
+    if gcloud artifacts repositories describe "$repo" \
+         --location="$GCP_REGION" --project="$GCP_PROJECT" >/dev/null 2>&1; then
+      gcloud artifacts repositories delete "$repo" \
+        --location="$GCP_REGION" --project="$GCP_PROJECT" --quiet
+      ok "  AR repo $repo 已刪除"
+    else
+      info "  $repo 不存在(跳過)"
+    fi
+  done
 }
 
 # ─────────────────────────────────────────────────────────

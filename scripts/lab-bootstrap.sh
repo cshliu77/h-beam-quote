@@ -38,11 +38,21 @@ AGENT_SA_EMAIL="${AGENT_SA_NAME}@${GCP_PROJECT}.iam.gserviceaccount.com"
 # Image 來源:預設 GHCR pre-built,BUILD_LOCAL=true 時改走 Artifact Registry
 H_BEAM_IMAGE="${H_BEAM_IMAGE:-ghcr.io/cshliu77/h-beam-quote:latest}"
 BUILD_LOCAL="${BUILD_LOCAL:-false}"
+
+# Cloud Run 不能直接拉 GHCR(只認 *-docker.pkg.dev / gcr.io / docker.io)。
+# 解法:用 AR remote repository 模式代理 GHCR,Cloud Run 從 AR 拉,AR 透明 proxy 至 GHCR。
+GHCR_PROXY_REPO="${GHCR_PROXY_REPO:-h-beam-ghcr-proxy}"
 AR_IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/${QUOTE_REPO}/${QUOTE_SERVICE}:latest"
 if [[ "$BUILD_LOCAL" == "true" ]]; then
   DEPLOY_IMAGE="$AR_IMAGE_URI"
 else
-  DEPLOY_IMAGE="$H_BEAM_IMAGE"
+  # 把 ghcr.io/<path>:<tag> 換成 ${REGION}-docker.pkg.dev/${PROJECT}/${PROXY_REPO}/<path>:<tag>
+  if [[ "$H_BEAM_IMAGE" != ghcr.io/* ]]; then
+    echo "ERROR: H_BEAM_IMAGE 必須以 ghcr.io/ 開頭(BUILD_LOCAL=false 模式):$H_BEAM_IMAGE" >&2
+    exit 1
+  fi
+  GHCR_PATH="${H_BEAM_IMAGE#ghcr.io/}"
+  DEPLOY_IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/${GHCR_PROXY_REPO}/${GHCR_PATH}"
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -96,7 +106,9 @@ preflight() {
   if [[ "$BUILD_LOCAL" == "true" ]]; then
     info "Image 來源:      Cloud Build → $AR_IMAGE_URI"
   else
-    info "Image 來源:      GHCR pre-built → $H_BEAM_IMAGE"
+    info "Image 來源:      $H_BEAM_IMAGE"
+    info "Cloud Run 拉取:  $DEPLOY_IMAGE"
+    info "                (AR remote repo 透明代理 GHCR)"
   fi
   info "Agent SA:        $AGENT_SA_EMAIL"
 }
@@ -173,24 +185,39 @@ setup_sa() {
 }
 
 # ─────────────────────────────────────────────────────────
-# Phase C:Artifact Registry(僅 BUILD_LOCAL=true 用)
+# Phase C:Artifact Registry
+#   BUILD_LOCAL=true  → standard repo(放本機 build 的 image)
+#   BUILD_LOCAL=false → remote repo(代理 GHCR,Cloud Run 從這拉)
 # ─────────────────────────────────────────────────────────
 setup_artifact_registry() {
-  if [[ "$BUILD_LOCAL" != "true" ]]; then
-    step "[C] 跳過 Artifact Registry(用 GHCR pre-built image,不需 AR)"
-    return
-  fi
-  step "[C] 確保 Artifact Registry repo 存在(${QUOTE_REPO} @ ${GCP_REGION})"
-
-  if gcloud artifacts repositories describe "$QUOTE_REPO" \
-      --location="$GCP_REGION" --project="$GCP_PROJECT" >/dev/null 2>&1; then
-    info "repo 已存在"
+  if [[ "$BUILD_LOCAL" == "true" ]]; then
+    step "[C] 確保 Artifact Registry standard repo 存在(${QUOTE_REPO} @ ${GCP_REGION})"
+    if gcloud artifacts repositories describe "$QUOTE_REPO" \
+        --location="$GCP_REGION" --project="$GCP_PROJECT" >/dev/null 2>&1; then
+      info "repo 已存在"
+    else
+      gcloud artifacts repositories create "$QUOTE_REPO" \
+        --repository-format=docker \
+        --location="$GCP_REGION" \
+        --project="$GCP_PROJECT" --quiet
+      ok "Artifact Registry standard repo 已建立"
+    fi
   else
-    gcloud artifacts repositories create "$QUOTE_REPO" \
-      --repository-format=docker \
-      --location="$GCP_REGION" \
-      --project="$GCP_PROJECT" --quiet
-    ok "Artifact Registry repo 已建立"
+    step "[C] 確保 Artifact Registry GHCR proxy repo 存在(${GHCR_PROXY_REPO} @ ${GCP_REGION})"
+    info "(Cloud Run 不能直拉 ghcr.io,用 AR remote repo 代理 GHCR)"
+    if gcloud artifacts repositories describe "$GHCR_PROXY_REPO" \
+        --location="$GCP_REGION" --project="$GCP_PROJECT" >/dev/null 2>&1; then
+      info "GHCR proxy repo 已存在"
+    else
+      gcloud artifacts repositories create "$GHCR_PROXY_REPO" \
+        --repository-format=docker \
+        --location="$GCP_REGION" \
+        --mode=remote-repository \
+        --remote-docker-repo="https://ghcr.io" \
+        --remote-repo-config-desc="GHCR remote proxy for h-beam-quote Lab image" \
+        --project="$GCP_PROJECT" --quiet
+      ok "GHCR proxy repo 已建立(${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/${GHCR_PROXY_REPO})"
+    fi
   fi
 }
 
