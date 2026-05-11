@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>H-BEAM QUOTE / 鋼骨報價系統</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            ink: '#0a0a0a',
+            steel: '#1a1d23',
+            iron: '#22262e',
+            mist: '#9ca3af',
+            paper: '#e8e6e1',
+            spec: '#f59e0b',  // construction yellow
+            weld: '#fb923c',  // welding orange
+            beam: '#60a5fa',  // engineering blue
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #0a0a0a;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+    .blueprint-grid {
+      background-image:
+        linear-gradient(rgba(245, 158, 11, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(245, 158, 11, 0.08) 1px, transparent 1px);
+      background-size: 16px 16px;
+    }
+    .cut-corner {
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    }
+    .pulse-dot {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .row-enter {
+      animation: row-in 0.3s ease-out backwards;
+    }
+    @keyframes row-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .tab-active {
+      color: #f59e0b;
+      border-color: #f59e0b;
+    }
+    .tab-inactive {
+      color: #6b7280;
+      border-color: transparent;
+    }
+    .tab-inactive:hover {
+      color: #d1d5db;
+    }
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0a0a0a; }
+    ::-webkit-scrollbar-thumb { background: #2a2d33; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a3d43; }
+  </style>
+</head>
+<body class="text-paper font-sans min-h-screen">
+
+  <!-- Top bar -->
+  <header class="border-b border-iron bg-ink/80 backdrop-blur-sm sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+      <div class="flex items-center gap-4">
+        <!-- H-beam mark -->
+        <svg width="28" height="28" viewBox="0 0 28 28" class="text-spec">
+          <rect x="4" y="4" width="20" height="3" fill="currentColor"/>
+          <rect x="12.5" y="4" width="3" height="20" fill="currentColor"/>
+          <rect x="4" y="21" width="20" height="3" fill="currentColor"/>
+        </svg>
+        <div>
+          <h1 class="text-base font-extrabold tracking-tight">H-BEAM QUOTE</h1>
+          <p class="text-[10px] uppercase tracking-[0.2em] text-mist font-mono">CNS 1490 / JIS G 3192</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-6 text-xs font-mono">
+        <div class="hidden sm:flex items-center gap-2 text-mist">
+          <span>GDG · AGENT RUNTIME LAB</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="status-dot" class="pulse-dot inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span id="api-status" class="text-emerald-400">API ONLINE</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+
+    <!-- Hero stats -->
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+      <div class="border border-iron bg-steel/50 p-4 cut-corner">
+        <div class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono mb-1">PRODUCTS</div>
+        <div class="text-2xl font-extrabold"><span id="stat-products">--</span></div>
+      </div>
+      <div class="border border-iron bg-steel/50 p-4 cut-corner">
+        <div class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono mb-1">GRADES</div>
+        <div class="text-2xl font-extrabold"><span id="stat-grades">--</span></div>
+      </div>
+      <div class="border border-iron bg-steel/50 p-4 cut-corner">
+        <div class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono mb-1">RANGE (mm)</div>
+        <div class="text-2xl font-extrabold font-mono"><span id="stat-range">--</span></div>
+      </div>
+      <div class="border border-iron bg-steel/50 p-4 cut-corner">
+        <div class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono mb-1">ENDPOINTS</div>
+        <div class="text-2xl font-extrabold font-mono text-spec">8</div>
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <div class="flex gap-1 border-b border-iron mb-6">
+      <button data-tab="catalog" class="tab-btn tab-active px-5 py-3 font-bold text-sm tracking-wide border-b-2 transition-colors">產品目錄</button>
+      <button data-tab="quote" class="tab-btn tab-inactive px-5 py-3 font-bold text-sm tracking-wide border-b-2 transition-colors">報價試算</button>
+      <button data-tab="quotes" class="tab-btn tab-inactive px-5 py-3 font-bold text-sm tracking-wide border-b-2 transition-colors">報價單列表</button>
+      <button data-tab="api" class="tab-btn tab-inactive px-5 py-3 font-bold text-sm tracking-wide border-b-2 transition-colors">API 端點</button>
+    </div>
+
+    <!-- ─── CATALOG ─── -->
+    <section id="tab-catalog">
+      <div class="border border-iron bg-steel/30">
+        <div class="flex justify-between items-center p-4 border-b border-iron">
+          <div>
+            <h2 class="font-bold text-sm uppercase tracking-wider">PRODUCT CATALOG</h2>
+            <p class="text-xs text-mist mt-0.5"><span id="product-count">0</span> 筆規格 · 來源:CNS 1490 / JIS G 3192</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono">FILTER</span>
+            <select id="filter-category" class="bg-ink border border-iron text-paper px-3 py-1.5 text-sm font-mono focus:border-spec focus:outline-none">
+              <option value="">ALL</option>
+              <option value="柱材">柱材</option>
+              <option value="樑材">樑材</option>
+              <option value="柱樑兩用">柱樑兩用</option>
+            </select>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono border-b border-iron">
+                <th class="px-4 py-3 text-left">CODE</th>
+                <th class="px-4 py-3 text-left">SERIES</th>
+                <th class="px-4 py-3 text-left">CATEGORY</th>
+                <th class="px-4 py-3 text-right">H</th>
+                <th class="px-4 py-3 text-right">B</th>
+                <th class="px-4 py-3 text-right">t1</th>
+                <th class="px-4 py-3 text-right">t2</th>
+                <th class="px-4 py-3 text-right">kg/m</th>
+                <th class="px-4 py-3 text-left">用途</th>
+              </tr>
+            </thead>
+            <tbody id="product-rows" class="divide-y divide-iron"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── QUOTE BUILDER ─── -->
+    <section id="tab-quote" class="hidden">
+      <div class="grid lg:grid-cols-2 gap-4">
+        <!-- Builder -->
+        <div class="border border-iron bg-steel/30">
+          <div class="p-4 border-b border-iron flex justify-between items-center">
+            <div>
+              <h2 class="font-bold text-sm uppercase tracking-wider">QUOTE BUILDER</h2>
+              <p class="text-xs text-mist mt-0.5">建立品項 + 議價條件 → 計算或反推目標價</p>
+            </div>
+            <button id="add-item" class="text-xs font-mono text-spec hover:text-weld border border-spec hover:border-weld px-3 py-1.5 transition-colors">+ ADD ITEM</button>
+          </div>
+          <div id="quote-items" class="p-4 space-y-2"></div>
+
+          <!-- Mode switcher -->
+          <div class="px-4 pb-2 pt-2 border-t border-iron">
+            <div class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono mb-2">CALC MODE</div>
+            <div class="flex gap-2">
+              <button data-mode="forward" class="mode-btn flex-1 px-3 py-2 text-xs font-mono border border-spec text-spec bg-spec/10">正向計算<br><span class="text-[10px] text-mist">(係數 / 折讓 / 加成)</span></button>
+              <button data-mode="match" class="mode-btn flex-1 px-3 py-2 text-xs font-mono border border-iron text-mist hover:text-paper">目標反推<br><span class="text-[10px] text-mist/70">(一口價 → 折讓 or 加成)</span></button>
+            </div>
+          </div>
+
+          <!-- Forward mode params -->
+          <div id="forward-params" class="px-4 pb-3 space-y-2">
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono">折扣係數</label>
+                <input id="qi-factor" type="number" step="0.01" min="0.01" max="1" value="1.0" class="w-full bg-ink border border-iron text-paper px-2 py-1.5 text-xs font-mono focus:border-spec focus:outline-none mt-1">
+              </div>
+              <div>
+                <label class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono">折讓 NT$</label>
+                <input id="qi-concession" type="number" min="0" value="0" class="w-full bg-ink border border-iron text-paper px-2 py-1.5 text-xs font-mono focus:border-spec focus:outline-none mt-1">
+              </div>
+              <div>
+                <label class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono">加成 NT$</label>
+                <input id="qi-surcharge" type="number" min="0" value="0" class="w-full bg-ink border border-iron text-paper px-2 py-1.5 text-xs font-mono focus:border-weld focus:outline-none mt-1">
+              </div>
+            </div>
+            <p class="text-[10px] text-mist/70 font-mono">F = S × factor - concession + surcharge   |   折讓與加成互斥</p>
+          </div>
+
+          <!-- Match mode params -->
+          <div id="match-params" class="px-4 pb-3 hidden">
+            <label class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono">目標一口價 NT$</label>
+            <input id="qi-target" type="number" min="1" value="950000" class="w-full bg-ink border border-iron text-paper px-2 py-1.5 text-xs font-mono focus:border-spec focus:outline-none mt-1">
+            <p class="text-[10px] text-mist/70 font-mono mt-1">系統反推所需 implied_concession 或 implied_surcharge</p>
+          </div>
+
+          <div class="p-4 border-t border-iron">
+            <button id="submit-quote" class="w-full bg-spec hover:bg-weld text-ink font-bold py-3 text-sm uppercase tracking-wider transition-colors">
+              CALCULATE
+            </button>
+          </div>
+        </div>
+
+        <!-- Result -->
+        <div class="border border-iron bg-steel/30 flex flex-col">
+          <div class="p-4 border-b border-iron flex justify-between items-center">
+            <div>
+              <h2 class="font-bold text-sm uppercase tracking-wider">RESPONSE</h2>
+              <p class="text-xs text-mist mt-0.5">API JSON 回應</p>
+            </div>
+            <span id="resp-time" class="text-xs font-mono text-mist">—</span>
+          </div>
+          <div class="flex-1 p-4 min-h-[320px]">
+            <pre id="quote-result" class="text-xs font-mono text-emerald-300 leading-relaxed overflow-auto h-full">// 點擊 CALCULATE 觸發 API 呼叫</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary card -->
+      <div id="quote-summary" class="hidden mt-4 border border-spec bg-spec/5 p-5 cut-corner">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <div class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono mb-1">總重量</div>
+            <div class="text-lg font-extrabold font-mono"><span id="sum-weight">0</span> <span class="text-xs text-mist">kg</span></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono mb-1">原始小計</div>
+            <div class="text-lg font-extrabold font-mono text-mist"><span id="sum-subtotal">0</span></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono mb-1">調整類型</div>
+            <div class="text-lg font-extrabold font-mono text-weld"><span id="sum-adj-type">—</span></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono mb-1">最終一口價</div>
+            <div class="text-2xl font-extrabold font-mono text-spec"><span id="sum-total">0</span></div>
+          </div>
+        </div>
+        <p id="discount-reason" class="text-xs text-mist mt-3 hidden font-mono"></p>
+        <div class="flex justify-end mt-4">
+          <button id="open-save-modal" class="border border-spec hover:bg-spec hover:text-ink text-spec font-bold px-5 py-2 text-xs uppercase tracking-wider transition-colors">
+            儲存為報價單 →
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SAVED QUOTES LIST ─── -->
+    <section id="tab-quotes" class="hidden">
+      <div class="border border-iron bg-steel/30">
+        <div class="p-4 border-b border-iron flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+          <div>
+            <h2 class="font-bold text-sm uppercase tracking-wider">SAVED QUOTES</h2>
+            <p class="text-xs text-mist mt-0.5">已存報價單(最新 50 筆)· 點 row 看完整議價軌跡</p>
+          </div>
+          <div class="flex flex-wrap items-end gap-2">
+            <div>
+              <label class="block text-[10px] uppercase tracking-[0.15em] text-mist font-mono">FILTER · 客戶</label>
+              <input id="ql-customer" class="bg-ink border border-iron text-paper px-2 py-1.5 text-xs font-mono focus:border-spec focus:outline-none mt-1 w-32" placeholder="(全部)" />
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase tracking-[0.15em] text-mist font-mono">FILTER · 業務員</label>
+              <input id="ql-user" class="bg-ink border border-iron text-paper px-2 py-1.5 text-xs font-mono focus:border-spec focus:outline-none mt-1 w-32" placeholder="(全部)" />
+            </div>
+            <button id="ql-refresh" class="text-xs font-mono text-spec hover:text-weld border border-spec hover:border-weld px-3 py-1.5 transition-colors">REFRESH</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono border-b border-iron">
+                <th class="px-4 py-3 text-left">ID</th>
+                <th class="px-4 py-3 text-left">客戶</th>
+                <th class="px-4 py-3 text-left">案場</th>
+                <th class="px-4 py-3 text-right">重量 kg</th>
+                <th class="px-4 py-3 text-right">最終價 NT$</th>
+                <th class="px-4 py-3 text-left">建立時間</th>
+                <th class="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody id="ql-rows" class="divide-y divide-iron"></tbody>
+          </table>
+        </div>
+        <div id="ql-empty" class="hidden p-10 text-center text-xs font-mono text-mist">
+          尚無已存報價 — 從「報價試算」算完後點「儲存為報價單」即可寫入
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── API DOCS ─── -->
+    <section id="tab-api" class="hidden">
+      <div class="border border-iron bg-steel/30">
+        <div class="p-4 border-b border-iron">
+          <h2 class="font-bold text-sm uppercase tracking-wider">API ENDPOINTS</h2>
+          <p class="text-xs text-mist mt-0.5">將以下 endpoint 包成 ADK FunctionTool 給您的 Agent</p>
+        </div>
+        <div class="divide-y divide-iron text-sm">
+
+          <div class="p-5">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="font-mono text-[10px] font-bold tracking-wider bg-emerald-500/20 text-emerald-400 px-2 py-1">GET</span>
+              <code class="font-mono text-paper">/api/products</code>
+              <span class="text-xs text-mist">列出所有產品</span>
+            </div>
+            <p class="text-xs text-mist mt-2">Query 參數:<code class="font-mono text-spec">?category=柱材</code> 可過濾</p>
+            <pre class="mt-2 bg-ink border border-iron p-3 text-xs font-mono text-emerald-300 overflow-x-auto">curl http://localhost:8080/api/products?category=樑材</pre>
+          </div>
+
+          <div class="p-5">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="font-mono text-[10px] font-bold tracking-wider bg-emerald-500/20 text-emerald-400 px-2 py-1">GET</span>
+              <code class="font-mono text-paper">/api/products/{code}</code>
+              <span class="text-xs text-mist">取得單一產品</span>
+            </div>
+            <pre class="mt-2 bg-ink border border-iron p-3 text-xs font-mono text-emerald-300 overflow-x-auto">curl http://localhost:8080/api/products/HW300x300</pre>
+          </div>
+
+          <div class="p-5">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="font-mono text-[10px] font-bold tracking-wider bg-emerald-500/20 text-emerald-400 px-2 py-1">GET</span>
+              <code class="font-mono text-paper">/api/grades</code>
+              <span class="text-xs text-mist">列出材質與單價</span>
+            </div>
+            <pre class="mt-2 bg-ink border border-iron p-3 text-xs font-mono text-emerald-300 overflow-x-auto">curl http://localhost:8080/api/grades</pre>
+          </div>
+
+          <div class="p-5">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="font-mono text-[10px] font-bold tracking-wider bg-beam/20 text-beam px-2 py-1">POST</span>
+              <code class="font-mono text-paper">/api/quotes</code>
+              <span class="text-xs text-mist">計算報價(支援議價:係數 / 折讓 / 加成)</span>
+            </div>
+            <pre class="mt-2 bg-ink border border-iron p-3 text-xs font-mono text-emerald-300 overflow-x-auto">curl -X POST http://localhost:8080/api/quotes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items":[{"product_code":"HW300x300","grade":"SS400","length_m":6,"quantity":20}],
+    "manual_discount_factor": 0.95,
+    "manual_concession_ntd": 5000
+  }'</pre>
+            <p class="text-xs text-mist mt-3">手動議價:0 &lt; factor ≤ 1;concession ≥ 0;surcharge ≥ 0;後兩者互斥。</p>
+          </div>
+
+          <div class="p-5">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="font-mono text-[10px] font-bold tracking-wider bg-beam/20 text-beam px-2 py-1">POST</span>
+              <code class="font-mono text-paper">/api/quotes/match</code>
+              <span class="text-xs text-mist">反向:給目標一口價,系統反推折讓 or 加成</span>
+            </div>
+            <pre class="mt-2 bg-ink border border-iron p-3 text-xs font-mono text-emerald-300 overflow-x-auto">curl -X POST http://localhost:8080/api/quotes/match \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items":[{"product_code":"HW300x300","grade":"SS400","length_m":6,"quantity":20}],
+    "target_final_ntd": 280000
+  }'</pre>
+          </div>
+
+          <div class="p-5">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="font-mono text-[10px] font-bold tracking-wider bg-beam/20 text-beam px-2 py-1">POST</span>
+              <code class="font-mono text-paper">/api/quotes/save</code>
+              <span class="text-xs text-mist">確認後存進 DB,回傳 quote_id(用於 Memory Bank)</span>
+            </div>
+            <pre class="mt-2 bg-ink border border-iron p-3 text-xs font-mono text-emerald-300 overflow-x-auto">curl -X POST http://localhost:8080/api/quotes/save \
+  -d '{"customer":"明陽營造","project":"板橋廠案","items":[...],"note":"客戶一口價需求"}'</pre>
+          </div>
+
+          <div class="p-5">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="font-mono text-[10px] font-bold tracking-wider bg-emerald-500/20 text-emerald-400 px-2 py-1">GET</span>
+              <code class="font-mono text-paper">/api/quotes</code>
+              <span class="text-xs text-mist">列已存報價(可 ?customer= 或 ?sales_user_id=)</span>
+            </div>
+          </div>
+
+          <div class="p-5">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="font-mono text-[10px] font-bold tracking-wider bg-emerald-500/20 text-emerald-400 px-2 py-1">GET</span>
+              <code class="font-mono text-paper">/api/quotes/{id}</code>
+              <span class="text-xs text-mist">取單一已存報價(完整 items + 議價軌跡)</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <footer class="mt-12 pt-6 border-t border-iron text-xs font-mono text-mist text-center">
+      H-BEAM QUOTE · GDG Agent Runtime Hands-on Lab · 2026/05/21
+    </footer>
+  </main>
+
+  <!-- ─── SAVE MODAL ─── -->
+  <div id="save-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="border border-spec bg-steel w-full max-w-lg cut-corner">
+      <div class="p-4 border-b border-iron flex justify-between items-center">
+        <div>
+          <h3 class="font-bold text-sm uppercase tracking-wider">儲存為報價單</h3>
+          <p class="text-xs text-mist mt-0.5 font-mono">POST /api/quotes/save</p>
+        </div>
+        <button id="save-modal-close" class="text-mist hover:text-paper text-xl leading-none px-2">×</button>
+      </div>
+      <div class="p-5 space-y-3">
+        <div>
+          <label class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono">客戶 *</label>
+          <input id="sv-customer" class="w-full bg-ink border border-iron text-paper px-3 py-2 text-sm font-mono focus:border-spec focus:outline-none mt-1" placeholder="明陽營造" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono">專案 / 案場</label>
+            <input id="sv-project" class="w-full bg-ink border border-iron text-paper px-3 py-2 text-sm font-mono focus:border-spec focus:outline-none mt-1" placeholder="板橋廠案" />
+          </div>
+          <div>
+            <label class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono">業務員 ID</label>
+            <input id="sv-user" class="w-full bg-ink border border-iron text-paper px-3 py-2 text-sm font-mono focus:border-spec focus:outline-none mt-1" placeholder="sales_chen" />
+          </div>
+        </div>
+        <div>
+          <label class="text-[10px] uppercase tracking-[0.15em] text-mist font-mono">議價備註(Memory Bank 萃取用)</label>
+          <textarea id="sv-note" rows="2" class="w-full bg-ink border border-iron text-paper px-3 py-2 text-sm font-mono focus:border-spec focus:outline-none mt-1" placeholder="客戶一口價需求 NT$ 280,000"></textarea>
+        </div>
+        <div id="sv-summary" class="text-xs font-mono text-mist border-t border-iron pt-3 space-y-1"></div>
+        <div id="sv-error" class="hidden text-xs font-mono text-red-400 border border-red-400/40 bg-red-500/10 px-3 py-2"></div>
+      </div>
+      <div class="p-4 border-t border-iron flex justify-end gap-2">
+        <button id="save-modal-cancel" class="text-xs font-mono text-mist hover:text-paper border border-iron hover:border-mist px-4 py-2 transition-colors">取消</button>
+        <button id="save-modal-submit" class="bg-spec hover:bg-weld text-ink font-bold px-5 py-2 text-xs uppercase tracking-wider transition-colors">確認儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── DETAIL MODAL ─── -->
+  <div id="detail-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="border border-spec bg-steel w-full max-w-3xl max-h-[90vh] flex flex-col cut-corner">
+      <div class="p-4 border-b border-iron flex justify-between items-center">
+        <div>
+          <h3 class="font-bold text-sm uppercase tracking-wider">QUOTE DETAIL</h3>
+          <p id="dt-id" class="text-xs text-mist mt-0.5 font-mono">—</p>
+        </div>
+        <button id="detail-modal-close" class="text-mist hover:text-paper text-xl leading-none px-2">×</button>
+      </div>
+      <div id="detail-body" class="p-5 overflow-auto flex-1 space-y-4 text-sm"></div>
+    </div>
+  </div>
+
+  <script>
+    let PRODUCTS = [];
+    let GRADES = [];
+
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const t = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.toggle('tab-active', b === btn);
+          b.classList.toggle('tab-inactive', b !== btn);
+        });
+        document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+        document.getElementById(`tab-${t}`).classList.remove('hidden');
+      });
+    });
+
+    // Load
+    async function load() {
+      try {
+        const [pr, gr] = await Promise.all([
+          fetch('/api/products').then(r => r.json()),
+          fetch('/api/grades').then(r => r.json()),
+        ]);
+        PRODUCTS = pr.products;
+        GRADES = gr.grades;
+        document.getElementById('stat-products').textContent = PRODUCTS.length;
+        document.getElementById('stat-grades').textContent = GRADES.length;
+        const heights = PRODUCTS.map(p => p.height_mm);
+        document.getElementById('stat-range').textContent = Math.min(...heights) + '–' + Math.max(...heights);
+        renderProducts();
+        addItem();
+      } catch (e) {
+        const dot = document.getElementById('status-dot');
+        const stat = document.getElementById('api-status');
+        dot.classList.remove('bg-emerald-400'); dot.classList.add('bg-red-400');
+        stat.classList.remove('text-emerald-400'); stat.classList.add('text-red-400');
+        stat.textContent = 'API ERROR';
+      }
+    }
+
+    function renderProducts() {
+      const cat = document.getElementById('filter-category').value;
+      const list = cat ? PRODUCTS.filter(p => p.category === cat) : PRODUCTS;
+      document.getElementById('product-count').textContent = list.length;
+      const tbody = document.getElementById('product-rows');
+      tbody.innerHTML = list.map((p, i) => `
+        <tr class="row-enter hover:bg-iron/40 transition-colors" style="animation-delay:${i*20}ms">
+          <td class="px-4 py-3 font-mono text-spec font-medium">${p.code}</td>
+          <td class="px-4 py-3 text-mist text-xs">${p.series}</td>
+          <td class="px-4 py-3 text-xs">${p.category}</td>
+          <td class="px-4 py-3 text-right font-mono">${p.height_mm}</td>
+          <td class="px-4 py-3 text-right font-mono">${p.width_mm}</td>
+          <td class="px-4 py-3 text-right font-mono text-mist">${p.web_thick_mm}</td>
+          <td class="px-4 py-3 text-right font-mono text-mist">${p.flange_thick_mm}</td>
+          <td class="px-4 py-3 text-right font-mono font-bold">${p.unit_weight_kg_per_m.toFixed(1)}</td>
+          <td class="px-4 py-3 text-xs text-mist">${p.application || ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('filter-category').addEventListener('change', renderProducts);
+
+    function addItem() {
+      const div = document.createElement('div');
+      div.className = 'grid grid-cols-12 gap-2 items-center';
+      div.innerHTML = `
+        <select class="qi-product col-span-4 bg-ink border border-iron text-paper px-2 py-1.5 text-xs font-mono focus:border-spec focus:outline-none">
+          ${PRODUCTS.map(p => `<option value="${p.code}">${p.code}</option>`).join('')}
+        </select>
+        <select class="qi-grade col-span-2 bg-ink border border-iron text-paper px-2 py-1.5 text-xs font-mono focus:border-spec focus:outline-none">
+          ${GRADES.map(g => `<option value="${g.code}">${g.code}</option>`).join('')}
+        </select>
+        <input class="qi-length col-span-2 bg-ink border border-iron text-paper px-2 py-1.5 text-xs font-mono focus:border-spec focus:outline-none" type="number" placeholder="m" value="6" min="0.1" step="0.1" />
+        <input class="qi-qty col-span-2 bg-ink border border-iron text-paper px-2 py-1.5 text-xs font-mono focus:border-spec focus:outline-none" type="number" placeholder="qty" value="10" min="1" />
+        <button class="qi-del col-span-2 text-xs font-mono text-red-400 hover:text-red-300 border border-iron hover:border-red-400 py-1.5 transition-colors">REMOVE</button>
+      `;
+      div.querySelector('.qi-del').addEventListener('click', () => div.remove());
+      document.getElementById('quote-items').appendChild(div);
+    }
+
+    document.getElementById('add-item').addEventListener('click', addItem);
+
+    // Mode switcher
+    let calcMode = 'forward';
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        calcMode = btn.dataset.mode;
+        document.querySelectorAll('.mode-btn').forEach(b => {
+          const active = b === btn;
+          b.classList.toggle('border-spec', active);
+          b.classList.toggle('text-spec', active);
+          b.classList.toggle('bg-spec/10', active);
+          b.classList.toggle('border-iron', !active);
+          b.classList.toggle('text-mist', !active);
+          b.classList.toggle('hover:text-paper', !active);
+        });
+        document.getElementById('forward-params').classList.toggle('hidden', calcMode !== 'forward');
+        document.getElementById('match-params').classList.toggle('hidden', calcMode !== 'match');
+      });
+    });
+
+    // Save context — 試算成功後保存,讓「儲存為報價單」可以重用
+    let lastQuoteContext = null;
+
+    document.getElementById('submit-quote').addEventListener('click', async () => {
+      const items = [...document.querySelectorAll('#quote-items > div')].map(d => ({
+        product_code: d.querySelector('.qi-product').value,
+        grade: d.querySelector('.qi-grade').value,
+        length_m: parseFloat(d.querySelector('.qi-length').value),
+        quantity: parseInt(d.querySelector('.qi-qty').value, 10),
+      }));
+
+      let factor = 1.0, concession = 0, surcharge = 0;
+      let url, body;
+      if (calcMode === 'forward') {
+        factor = parseFloat(document.getElementById('qi-factor').value) || 1.0;
+        concession = parseFloat(document.getElementById('qi-concession').value) || 0;
+        surcharge = parseFloat(document.getElementById('qi-surcharge').value) || 0;
+        if (concession > 0 && surcharge > 0) {
+          alert('折讓與加成互斥,只能擇一 > 0');
+          return;
+        }
+        url = '/api/quotes';
+        body = { items };
+        if (factor !== 1.0) body.manual_discount_factor = factor;
+        if (concession > 0) body.manual_concession_ntd = concession;
+        if (surcharge > 0) body.manual_surcharge_ntd = surcharge;
+      } else {
+        const target = parseFloat(document.getElementById('qi-target').value);
+        if (!target || target <= 0) { alert('目標一口價必須 > 0'); return; }
+        url = '/api/quotes/match';
+        body = { items, target_final_ntd: target };
+      }
+
+      const t0 = performance.now();
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        const t1 = performance.now();
+        document.getElementById('resp-time').textContent = `${(t1 - t0).toFixed(0)}ms`;
+        document.getElementById('quote-result').textContent = JSON.stringify(data, null, 2);
+
+        if (r.ok) {
+          document.getElementById('quote-summary').classList.remove('hidden');
+
+          // 捕捉 context 給「儲存為報價單」用 — match 模式把 implied_* 翻譯成 manual_*
+          if (calcMode === 'match') {
+            concession = data.implied_concession_ntd || 0;
+            surcharge = data.implied_surcharge_ntd || 0;
+            factor = 1.0;
+          }
+          lastQuoteContext = {
+            items: JSON.parse(JSON.stringify(items)),
+            manual_discount_factor: factor,
+            manual_concession_ntd: concession,
+            manual_surcharge_ntd: surcharge,
+          };
+          // 統一兩種模式的欄位:match mode 沒 total_weight_kg
+          const weight = data.total_weight_kg ?? 0;
+          document.getElementById('sum-weight').textContent = weight.toLocaleString('en-US', {maximumFractionDigits: 1});
+          document.getElementById('sum-subtotal').textContent = Math.round(data.subtotal_ntd).toLocaleString();
+          document.getElementById('sum-adj-type').textContent = data.adjustment_type || '原價';
+          document.getElementById('sum-total').textContent = Math.round(data.final_total_ntd).toLocaleString();
+
+          const reason = document.getElementById('discount-reason');
+          const eff = data.effective_discount_rate || 0;
+          let line = '';
+          if (Math.abs(eff) > 0.0001) {
+            const pct = (Math.abs(eff) * 100).toFixed(1);
+            line = eff > 0 ? `◆ 相對原價折讓 ${pct}%(等同打 ${(100 - eff * 100).toFixed(1)} 折)`
+                            : `◆ 相對原價加成 ${pct}%`;
+          }
+          if (calcMode === 'match') {
+            if (data.implied_concession_ntd > 0) line += `   |   需折讓 NT$ ${Math.round(data.implied_concession_ntd).toLocaleString()}`;
+            if (data.implied_surcharge_ntd > 0) line += `   |   需加成 NT$ ${Math.round(data.implied_surcharge_ntd).toLocaleString()}`;
+          }
+          reason.textContent = line;
+          reason.classList.toggle('hidden', !line);
+        }
+      } catch (e) {
+        document.getElementById('quote-result').textContent = 'ERROR: ' + e.message;
+      }
+    });
+
+    // ─────────────────────────────────────────
+    //  小工具:用 DOM API 安全建構元素(避免 innerHTML 拼字串)
+    // ─────────────────────────────────────────
+    function el(tag, attrs, children) {
+      const node = document.createElement(tag);
+      if (attrs) {
+        for (const k in attrs) {
+          const v = attrs[k];
+          if (v == null || v === false) continue;
+          if (k === 'class')      node.className = v;
+          else if (k === 'text')  node.textContent = v;
+          else if (k === 'style') Object.assign(node.style, v);
+          else if (k === 'data')  Object.assign(node.dataset, v);
+          else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+          else node.setAttribute(k, v);
+        }
+      }
+      if (children != null) {
+        const arr = Array.isArray(children) ? children : [children];
+        for (const c of arr) {
+          if (c == null) continue;
+          node.appendChild(c.nodeType ? c : document.createTextNode(String(c)));
+        }
+      }
+      return node;
+    }
+
+    // ─────────────────────────────────────────
+    //  SAVE MODAL
+    // ─────────────────────────────────────────
+    const saveModal = document.getElementById('save-modal');
+    const svErr = document.getElementById('sv-error');
+
+    function openSaveModal() {
+      if (!lastQuoteContext) { alert('請先計算一次報價,才能儲存。'); return; }
+      svErr.classList.add('hidden');
+      const c = lastQuoteContext;
+      const lines = [`品項數:${c.items.length} 筆`];
+      if (c.manual_discount_factor !== 1.0) lines.push(`折扣係數:${c.manual_discount_factor}`);
+      if (c.manual_concession_ntd > 0) lines.push(`折讓:NT$ ${Math.round(c.manual_concession_ntd).toLocaleString()}`);
+      if (c.manual_surcharge_ntd > 0) lines.push(`加成:NT$ ${Math.round(c.manual_surcharge_ntd).toLocaleString()}`);
+      if (lines.length === 1) lines.push('原價(無議價調整)');
+      document.getElementById('sv-summary').replaceChildren(
+        ...lines.map(t => el('div', { text: '◆ ' + t }))
+      );
+      saveModal.classList.remove('hidden');
+      document.getElementById('sv-customer').focus();
+    }
+    function closeSaveModal() { saveModal.classList.add('hidden'); }
+
+    document.getElementById('open-save-modal').addEventListener('click', openSaveModal);
+    document.getElementById('save-modal-close').addEventListener('click', closeSaveModal);
+    document.getElementById('save-modal-cancel').addEventListener('click', closeSaveModal);
+    saveModal.addEventListener('click', (e) => { if (e.target === saveModal) closeSaveModal(); });
+
+    document.getElementById('save-modal-submit').addEventListener('click', async () => {
+      const customer = document.getElementById('sv-customer').value.trim();
+      const project  = document.getElementById('sv-project').value.trim();
+      const userId   = document.getElementById('sv-user').value.trim();
+      const note     = document.getElementById('sv-note').value.trim();
+      svErr.classList.add('hidden');
+      if (!customer) { svErr.textContent = '客戶為必填欄位'; svErr.classList.remove('hidden'); return; }
+      if (!lastQuoteContext) { svErr.textContent = '尚未試算,請先計算一次。'; svErr.classList.remove('hidden'); return; }
+
+      const body = { customer, items: lastQuoteContext.items };
+      if (project) body.project = project;
+      if (userId)  body.sales_user_id = userId;
+      if (note)    body.note = note;
+      if (lastQuoteContext.manual_discount_factor !== 1.0) body.manual_discount_factor = lastQuoteContext.manual_discount_factor;
+      if (lastQuoteContext.manual_concession_ntd > 0)      body.manual_concession_ntd  = lastQuoteContext.manual_concession_ntd;
+      if (lastQuoteContext.manual_surcharge_ntd > 0)       body.manual_surcharge_ntd   = lastQuoteContext.manual_surcharge_ntd;
+
+      try {
+        const r = await fetch('/api/quotes/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          svErr.textContent = data.error || `HTTP ${r.status}`;
+          svErr.classList.remove('hidden');
+          return;
+        }
+        const saved = await r.json();
+        document.getElementById('sv-note').value = '';
+        closeSaveModal();
+        document.querySelector('[data-tab="quotes"]').click();
+        await loadQuotes();
+        flashRow(saved.id);
+      } catch (e) {
+        svErr.textContent = e.message;
+        svErr.classList.remove('hidden');
+      }
+    });
+
+    // ─────────────────────────────────────────
+    //  QUOTES LIST
+    // ─────────────────────────────────────────
+    async function loadQuotes() {
+      const customer = document.getElementById('ql-customer').value.trim();
+      const userId   = document.getElementById('ql-user').value.trim();
+      const params = new URLSearchParams();
+      if (customer) params.set('customer', customer);
+      if (userId)   params.set('sales_user_id', userId);
+      const qs = params.toString();
+      const url = '/api/quotes' + (qs ? '?' + qs : '');
+      const rowsBody = document.getElementById('ql-rows');
+      const empty = document.getElementById('ql-empty');
+      try {
+        const r = await fetch(url);
+        const data = await r.json();
+        const list = data.quotes || [];
+        if (list.length === 0) {
+          rowsBody.replaceChildren();
+          empty.classList.remove('hidden');
+          return;
+        }
+        empty.classList.add('hidden');
+        rowsBody.replaceChildren(...list.map((q, i) => el('tr', {
+          class: 'row-enter hover:bg-iron/40 transition-colors cursor-pointer',
+          data: { id: String(q.id) },
+          style: { animationDelay: (i * 15) + 'ms' },
+          onclick: () => openDetail(q.id),
+        }, [
+          el('td', { class: 'px-4 py-3 font-mono text-spec font-medium', text: '#' + q.id }),
+          el('td', { class: 'px-4 py-3 text-paper',                       text: q.customer }),
+          el('td', { class: 'px-4 py-3 text-mist text-xs',                text: q.project || '—' }),
+          el('td', { class: 'px-4 py-3 text-right font-mono',             text: q.total_weight_kg.toLocaleString('en-US', { maximumFractionDigits: 1 }) }),
+          el('td', { class: 'px-4 py-3 text-right font-mono font-bold text-spec', text: Math.round(q.final_total_ntd).toLocaleString() }),
+          el('td', { class: 'px-4 py-3 text-xs text-mist font-mono',      text: q.created_at }),
+          el('td', { class: 'px-4 py-3 text-right text-xs text-spec font-mono', text: 'VIEW →' }),
+        ])));
+      } catch (e) {
+        rowsBody.replaceChildren(el('tr', null,
+          el('td', { class: 'px-4 py-6 text-center text-red-400 text-xs font-mono', colspan: '7', text: 'ERROR: ' + e.message })
+        ));
+        empty.classList.add('hidden');
+      }
+    }
+
+    function flashRow(id) {
+      const tr = document.querySelector(`#ql-rows tr[data-id="${id}"]`);
+      if (!tr) return;
+      tr.style.transition = 'background-color 0.6s';
+      tr.style.backgroundColor = 'rgba(245, 158, 11, 0.25)';
+      setTimeout(() => { tr.style.backgroundColor = ''; }, 1800);
+    }
+
+    document.getElementById('ql-refresh').addEventListener('click', loadQuotes);
+    ['ql-customer', 'ql-user'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') loadQuotes();
+      });
+    });
+    document.querySelector('[data-tab="quotes"]').addEventListener('click', loadQuotes);
+
+    // ─────────────────────────────────────────
+    //  DETAIL MODAL
+    // ─────────────────────────────────────────
+    const detailModal = document.getElementById('detail-modal');
+
+    async function openDetail(id) {
+      document.getElementById('dt-id').textContent = `LOADING #${id}…`;
+      document.getElementById('detail-body').replaceChildren();
+      detailModal.classList.remove('hidden');
+      try {
+        const r = await fetch(`/api/quotes/${id}`);
+        if (!r.ok) {
+          document.getElementById('detail-body').replaceChildren(
+            el('p', { class: 'text-red-400 text-xs font-mono', text: `HTTP ${r.status}` })
+          );
+          return;
+        }
+        const q = await r.json();
+        document.getElementById('dt-id').textContent = `#${q.id} · ${q.created_at}`;
+        document.getElementById('detail-body').replaceChildren(...renderDetail(q));
+      } catch (e) {
+        document.getElementById('detail-body').replaceChildren(
+          el('p', { class: 'text-red-400 text-xs font-mono', text: 'ERROR: ' + e.message })
+        );
+      }
+    }
+
+    function renderDetail(q) {
+      const adj = [];
+      if (q.manual_discount_factor < 1.0) adj.push(`折扣係數 ${q.manual_discount_factor}`);
+      if (q.manual_concession_ntd > 0)    adj.push(`折讓 NT$ ${Math.round(q.manual_concession_ntd).toLocaleString()}`);
+      if (q.manual_surcharge_ntd > 0)     adj.push(`加成 NT$ ${Math.round(q.manual_surcharge_ntd).toLocaleString()}`);
+      const adjLine = adj.length ? adj.join(' · ') : '原價(無議價)';
+
+      const labelEl = (txt) => el('div', { class: 'text-[10px] uppercase tracking-[0.15em] text-mist font-mono', text: txt });
+      const headerCard = (label, value, mono) => el('div', { class: 'border border-iron bg-ink/50 p-3' }, [
+        labelEl(label),
+        el('div', { class: 'font-bold text-paper mt-1' + (mono ? ' font-mono' : ''), text: value || '—' }),
+      ]);
+
+      const headerRow = el('div', { class: 'grid grid-cols-2 md:grid-cols-3 gap-3' }, [
+        headerCard('客戶', q.customer),
+        headerCard('專案', q.project),
+        headerCard('業務員', q.sales_user_id, true),
+      ]);
+
+      const itemRows = (q.items || []).map(it => el('tr', { class: 'hover:bg-iron/40' }, [
+        el('td', { class: 'px-3 py-2 font-mono text-spec',          text: it.product_code }),
+        el('td', { class: 'px-3 py-2 font-mono text-mist',          text: it.grade }),
+        el('td', { class: 'px-3 py-2 text-right font-mono text-xs', text: `${it.length_m}m × ${it.quantity}` }),
+        el('td', { class: 'px-3 py-2 text-right font-mono',         text: it.weight_kg.toLocaleString('en-US', { maximumFractionDigits: 1 }) }),
+        el('td', { class: 'px-3 py-2 text-right font-mono',         text: Math.round(it.line_subtotal_ntd).toLocaleString() }),
+      ]));
+
+      const headTr = el('tr', { class: 'text-[10px] uppercase tracking-[0.15em] text-mist font-mono border-b border-iron' }, [
+        el('th', { class: 'px-3 py-2 text-left',  text: 'CODE' }),
+        el('th', { class: 'px-3 py-2 text-left',  text: 'GRADE' }),
+        el('th', { class: 'px-3 py-2 text-right', text: '尺寸 × 數量' }),
+        el('th', { class: 'px-3 py-2 text-right', text: '重量 kg' }),
+        el('th', { class: 'px-3 py-2 text-right', text: '小計 NT$' }),
+      ]);
+
+      const itemsBox = el('div', { class: 'border border-iron' }, [
+        el('div', { class: 'p-3 border-b border-iron' }, [
+          labelEl(`ITEMS · ${(q.items || []).length} 筆`),
+        ]),
+        el('table', { class: 'w-full text-xs' }, [
+          el('thead', null, headTr),
+          el('tbody', { class: 'divide-y divide-iron' }, itemRows),
+        ]),
+      ]);
+
+      const stat = (label, value, big, color) => el('div', null, [
+        labelEl(label),
+        el('div', { class: `${big ? 'text-xl' : 'text-base'} font-extrabold font-mono mt-1 ${color || ''}`, text: value }),
+      ]);
+
+      const adjBox = el('div', { class: 'border border-spec bg-spec/5 p-4 cut-corner' }, [
+        labelEl('議價軌跡'),
+        el('div', { class: 'text-xs font-mono text-paper my-2', text: adjLine }),
+        el('div', { class: 'grid grid-cols-3 gap-3 mt-3' }, [
+          stat('總重量', q.total_weight_kg.toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' kg'),
+          stat('原始小計', Math.round(q.subtotal_ntd).toLocaleString(), false, 'text-mist'),
+          stat('最終一口價', Math.round(q.final_total_ntd).toLocaleString(), true, 'text-spec'),
+        ]),
+        q.note ? el('div', { class: 'mt-3 pt-3 border-t border-iron' }, [
+          labelEl('備註'),
+          el('div', { class: 'text-xs font-mono text-paper mt-1', text: q.note }),
+        ]) : null,
+      ]);
+
+      return [headerRow, itemsBox, adjBox];
+    }
+
+    document.getElementById('detail-modal-close').addEventListener('click', () => detailModal.classList.add('hidden'));
+    detailModal.addEventListener('click', (e) => { if (e.target === detailModal) detailModal.classList.add('hidden'); });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (!saveModal.classList.contains('hidden'))   saveModal.classList.add('hidden');
+      if (!detailModal.classList.contains('hidden')) detailModal.classList.add('hidden');
+    });
+
+    load();
+  </script>
+</body>
+</html>

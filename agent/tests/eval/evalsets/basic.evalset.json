@@ -1,0 +1,126 @@
+{
+  "eval_set_id": "h_beam_basic_eval",
+  "name": "H-Beam Quote Agent — Basic Capability Evaluation",
+  "description": "5 個情境覆蓋 H-Beam Agent 核心能力:規格速查、打折估價、目標反推、加成、客戶記憶。對應 lab_script.md §3 本地試跑的 5 個 query。",
+  "eval_cases": [
+    {
+      "eval_id": "spec_lookup",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "HW300x300 多重?"}]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "get_product", "args": {"code": "HW300x300"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_sales_chen",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "discount_factor_quote",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "估給太平洋:HW300x300 SS400 6m 20 支,幫我打 95 折"}]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "calculate_quote",
+                "args": {
+                  "items": [{"product_code": "HW300x300", "grade": "SS400", "length_m": 6, "quantity": 20}],
+                  "manual_discount_factor": 0.95
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_sales_chen",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "match_target_concession",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "估給太平洋:HW300x300 SS400 6m 20 支,客戶說只給 28 萬,看怎麼喬?"}]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "match_target_price",
+                "args": {
+                  "items": [{"product_code": "HW300x300", "grade": "SS400", "length_m": 6, "quantity": 20}],
+                  "target_final_ntd": 280000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_sales_chen",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "match_target_surcharge",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "估給太平洋:HW300x300 SS400 6m 20 支,湊個 50 萬整數一口價試試"}]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "match_target_price",
+                "args": {
+                  "items": [{"product_code": "HW300x300", "grade": "SS400", "length_m": 6, "quantity": 20}],
+                  "target_final_ntd": 500000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_sales_chen",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "customer_memory_recall",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "幫我列一下明陽營造過去的所有報價"}]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "load_memory", "args": {"query": "明陽營造"}},
+              {"name": "list_customer_quotes", "args": {"customer": "明陽營造"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_sales_chen",
+        "state": {}
+      }
+    }
+  ]
+}
